@@ -13,7 +13,7 @@ from tmdbhelper_sync_simkl.directories.routes import LIST_ROUTES
 
 
 class Provider(SyncProvider):
-    interface_version = 3
+    interface_version = 4
     provider_id = 'simkl'
     display_name = 'SIMKL'
     sync_classes = {
