@@ -15,6 +15,6 @@ class SimklShowsToWatch(SyncDataGetterAllShowsToWatch):
 
 
 class SimklShowsInProgress(SyncDataGetterAllUnHiddenShowsNextEpisode):
-    # SiMKL's next_to_watch is authoritative, including caught-up shows. Episode
+    # SIMKL's next_to_watch is authoritative, including caught-up shows. Episode
     # counts can be stale and must not keep finished shows in progress lists.
     query_clauses = ('item_type=?', 'dropped_hidden_at IS NULL')

@@ -2,7 +2,15 @@ from time import monotonic, time
 from uuid import uuid4
 from xbmc import Monitor
 from xbmcgui import Dialog, DialogProgress
-from tmdbhelper_sync_simkl.api import SimklAPIError
+from jurialmunkey.parser import try_int
+from tmdbhelper.lib.addon.logger import kodi_log
+from tmdbhelper_sync_simkl.errors import SimklAPIError
+
+SCOPE = 'media:read'
+DEFAULT_EXPIRES_IN = 7 * 86400
+
+# OAuth errors meaning the stored grant can never be refreshed again.
+REVOKED_GRANT_ERRORS = ('invalid_grant', 'invalid_client', 'unauthorized_client', 'invalid_token')
 
 
 class SimklAuthorization:
@@ -26,13 +34,19 @@ class SimklAuthorization:
         return auth['access_token']
 
     def save_tokens(self, data, previous=None):
-        if 'media:read' not in data['scope'].split():
+        previous = previous or {}
+        # Token responses may omit an unchanged scope or a non-rotated refresh token.
+        scope = data.get('scope') or previous.get('scope') or SCOPE
+        refresh_token = data.get('refresh_token') or previous.get('refresh_token')
+        if not data.get('access_token') or not refresh_token:
+            raise SimklAPIError('invalid_token_response')
+        if SCOPE not in scope.split():
             raise SimklAPIError('insufficient_scope')
         auth = {
             'client_id': self.settings.client_id,
-            'session_id': previous['session_id'] if previous else uuid4().hex,
-            'access_token': data['access_token'], 'refresh_token': data['refresh_token'],
-            'expires_at': time() + data['expires_in'], 'scope': data['scope'],
+            'session_id': previous.get('session_id') or uuid4().hex,
+            'access_token': data['access_token'], 'refresh_token': refresh_token,
+            'expires_at': time() + (try_int(data.get('expires_in')) or DEFAULT_EXPIRES_IN), 'scope': scope,
         }
         self.settings.authorization = auth
         return auth['access_token']
@@ -47,10 +61,19 @@ class SimklAuthorization:
             # Another Kodi process may already have refreshed this grant.
             if auth['access_token'] != old_token:
                 return auth['access_token']
-            data = self.api.request('oauth2/token', data={
-                'client_id': self.settings.client_id, 'grant_type': 'refresh_token',
-                'refresh_token': auth['refresh_token'],
-            }, authorized=False)
+            try:
+                data = self.api.request('oauth2/token', data={
+                    'client_id': self.settings.client_id, 'grant_type': 'refresh_token',
+                    'refresh_token': auth['refresh_token'],
+                }, authorized=False)
+            except SimklAPIError as exc:
+                if exc.code not in REVOKED_GRANT_ERRORS:
+                    raise
+                # The grant is gone: stop retrying and show the account as disconnected.
+                kodi_log('SIMKL authorization expired or was revoked. Reconnect the SIMKL account.', 1)
+                self.api.store.clear()
+                self.settings.authorization = {}
+                raise SimklAPIError('authorization_required', exc.status) from None
             return self.save_tokens(data, auth)
 
     def connect(self):
@@ -59,12 +82,16 @@ class SimklAuthorization:
             return False
         try:
             code = self.api.request('oauth2/device', data={
-                'client_id': self.settings.client_id, 'scope': 'media:read',
+                'client_id': self.settings.client_id, 'scope': SCOPE,
             }, authorized=False)
-            return self.poll(code)
+            if not self.poll(code):
+                return False
         except SimklAPIError as exc:
             Dialog().ok('SIMKL', str(exc))
             return False
+        # Each authorization has its own namespace; drop snapshots from older ones.
+        self.api.store.prune()
+        return True
 
     def poll(self, code):
         monitor = Monitor()
@@ -101,14 +128,14 @@ class SimklAuthorization:
         return False
 
     def disconnect(self):
-        if not self.is_authorized:
-            self.settings.authorization = {}
-            return
-        try:
-            self.api.request('oauth2/revoke', data={
-                'client_id': self.settings.client_id,
-                'token': self.settings.authorization['refresh_token'],
-            }, authorized=False)
-        except SimklAPIError as exc:
-            Dialog().ok('SIMKL', f'{exc}\nYou can also revoke access in SIMKL Connected Apps.')
+        auth = self.settings.authorization
+        # Revoke with the client the grant was issued to, even if the setting changed since.
+        if auth.get('refresh_token') and auth.get('client_id'):
+            try:
+                self.api.request('oauth2/revoke', data={
+                    'client_id': auth['client_id'], 'token': auth['refresh_token'],
+                }, authorized=False)
+            except SimklAPIError as exc:
+                Dialog().ok('SIMKL', f'{exc}\nYou can also revoke access in SIMKL Connected Apps.')
+        self.api.store.clear()
         self.settings.authorization = {}

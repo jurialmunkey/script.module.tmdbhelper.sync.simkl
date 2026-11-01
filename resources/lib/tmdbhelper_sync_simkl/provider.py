@@ -1,3 +1,4 @@
+from json import dumps
 from jurialmunkey.ftools import cached_property
 from tmdbhelper.lib.addon.logger import kodi_log
 from tmdbhelper.lib.sync.providers.base import SyncProvider
@@ -50,12 +51,20 @@ class Provider(SyncProvider):
     def get_library(self):
         return SimklLibrary(self.api)
 
-    @cached_property
-    def library_items(self):
-        return self.get_library_items()
+    _library_items = None
 
-    def get_library_items(self):
-        return SimklLibraryMapping(self.library.get_entries(), self.identifiers).get_items()
+    @property
+    def library_items(self):
+        # A provider can outlive one sync (e.g. the post-playback refresh), so
+        # re-map whenever the stored snapshot's activity changes.
+        snapshot = self.library.get_snapshot()
+        key = dumps(snapshot['activity'], sort_keys=True)
+        if self._library_items is None or self._library_items[0] != key:
+            self._library_items = (key, self.get_library_items(snapshot['entries']))
+        return self._library_items[1]
+
+    def get_library_items(self, entries):
+        return SimklLibraryMapping(entries, self.identifiers).get_items()
 
     @cached_property
     def user_lists(self):
@@ -78,7 +87,7 @@ class Provider(SyncProvider):
 
     @staticmethod
     def map_activities(data):
-        television = (data.get('tv_shows', {}), data.get('anime', {}))
+        television = (data.get('tv_shows') or {}, data.get('anime') or {})
         return {
             item_type: {
                 'watchlisted_at': latest(
@@ -89,6 +98,6 @@ class Provider(SyncProvider):
                 'paused_at': latest(bucket.get('playback') for bucket in buckets),
             }
             for item_type, buckets in (
-                ('movies', (data.get('movies', {}), data.get('anime', {}))),
+                ('movies', (data.get('movies') or {}, data.get('anime') or {})),
                 ('shows', television), ('seasons', television), ('episodes', television))
         }

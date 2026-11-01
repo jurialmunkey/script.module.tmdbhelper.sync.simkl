@@ -3,30 +3,41 @@ from sys import argv, path
 from xbmc import executebuiltin
 from xbmcaddon import Addon
 
+ADDON_ID = 'script.module.tmdbhelper.sync.simkl'
+
 
 def configure():
     executebuiltin(
         'RunScript(plugin.video.themoviedb.helper,configure_sync_provider,'
-        'addon_id=script.module.tmdbhelper.sync.simkl)')
+        f'addon_id={ADDON_ID})')
+
+
+def reopen_settings():
+    # Settings buttons close (and save) the dialog before running this script.
+    executebuiltin(f'Addon.OpenSettings({ADDON_ID})')
 
 
 def main():
-    addon = Addon('script.module.tmdbhelper.sync.simkl')
+    addon = Addon(ADDON_ID)
     path.insert(0, join(Addon('plugin.video.themoviedb.helper').getAddonInfo('path'), 'resources'))
     from tmdbhelper.lib.sync.providers.loader import SyncProviderLoader
     module = SyncProviderLoader({
         'addonid': addon.getAddonInfo('id'), 'path': addon.getAddonInfo('path'),
     }).load_module()
-    api = module.Provider().api
+    provider = module.Provider()
+    auth = provider.api.auth
     action = argv[1] if len(argv) > 1 else 'configure'
     if action == 'disconnect':
-        api.auth.disconnect()
-        invalidate_sync(module.Provider())
+        auth.disconnect()
+        invalidate_sync(provider)
+        reopen_settings()
     elif action == 'connect':
-        if api.auth.connect():
-            invalidate_sync(module.Provider())
-            configure()
-    elif api.auth.is_authorized:
+        if not auth.connect():
+            reopen_settings()
+            return
+        invalidate_sync(provider)
+        configure()
+    elif auth.is_authorized:
         configure()
     else:
         addon.openSettings()

@@ -37,14 +37,17 @@ V1 credentials will not work with AUTH V2 or custom lists.
 
 Uses SIMKL's RFC 8628 device grant with `media:read`. Access tokens last seven
 days; refresh tokens have a sliding 180-day lifetime. Refreshes are serialized
-across Kodi processes and reread the shared token before refreshing. Disconnect
-revokes the grant and clears the stored authorization.
+across Kodi processes and reread the shared token before refreshing. If SIMKL
+rejects the refresh token (expired or revoked), the stored authorization and
+snapshots are cleared and the account must be reconnected. Disconnect revokes the
+grant and clears the stored authorization and snapshots.
 
 Tokens are stored in the addon's private Kodi settings, separate from the source
 snapshots. Treat the provider's addon-data folder as private and exclude its
 settings from shared backups. Tokens are never included in log messages or URLs.
 Each new authorization gets a separate snapshot namespace, including when the
-client ID or SIMKL account changes.
+client ID or SIMKL account changes. Snapshots from earlier authorizations are
+deleted after a successful connection.
 
 The device-specific API uses `/oauth2/device` and the device-code grant at
 `/oauth2/token`. PKCE belongs to the separate browser authorization-code grant.
@@ -63,7 +66,8 @@ Episode history requests include full episode rows and watched timestamps.
 For legacy watchlist entries without an added-at timestamp, the provider keeps
 the local UTC first-seen time; that is not the original date added on SIMKL.
 SIMKL may synthesize episode dates from a bulk-completed show's last watch time;
-these are not independently recorded episode watch dates. SIMKL does not expose
+these are not independently recorded episode watch dates. SIMKL has no manual
+watchlist order, so watchlist rank follows the date added, oldest first. SIMKL does not expose
 ordinary replay counts in this response, so watched items use a count of one.
 Explicit rewatch-session tracking is outside this version.
 
@@ -71,8 +75,9 @@ Titles without a resolvable TMDb identifier are skipped. Anime uses the API's
 episode cross-maps rather than treating absolute numbers as season numbers;
 TMDb and TVDB season numbering can still differ. Anime films are resolved through
 their IMDb movie identifier because their TMDb reference may identify a parent
-TV show. Unmapped anime titles or episodes are omitted rather than assigned
-invented identifiers.
+TV show. The same rules apply to paused playback. Unmapped anime titles or
+episodes are omitted rather than assigned invented identifiers. A malformed title
+in a SIMKL response is logged and skipped without failing the rest of the sync.
 
 Custom lists cache metadata using `custom_lists.lists.all`, contents using each
 list's `updated_at`, and auto-list contents for at most one day. The API's

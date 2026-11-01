@@ -34,3 +34,15 @@ class SimklStore:
 
     def key(self, name):
         return f'{self.settings.account_key}.{name}'
+
+    def prune(self):
+        """Delete snapshots that belong to any authorization other than the current one."""
+        prefix = f'{self.settings.account_key}.'
+        with closing(connect(self.path)) as connection:
+            connection.execute('DELETE FROM state WHERE substr(id, 1, ?) != ?', (len(prefix), prefix))
+            connection.commit()
+
+    def clear(self):
+        with closing(connect(self.path)) as connection:
+            connection.execute('DELETE FROM state')
+            connection.commit()

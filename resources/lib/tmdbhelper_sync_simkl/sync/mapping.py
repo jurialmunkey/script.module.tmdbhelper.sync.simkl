@@ -75,7 +75,8 @@ class SimklEntry:
         match = fullmatch(r'S(\d+)E(\d+)', marker)
         if self.source_type != 'anime':
             if match is None:
-                raise ValueError(f'Invalid SIMKL next episode marker: {marker}')
+                kodi_log(f'SIMKL: unrecognised next episode {marker!r} for {self.title["ids"].get("simkl")}', 2)
+                return
             return tuple(int(value) for value in match.groups())
         # Native anime next markers cannot be assumed to use TMDb numbering.
         # Find the corresponding cross-map in the supplied episode rows.
@@ -105,7 +106,7 @@ class SimklEntry:
             'aired_episodes': max(0, try_int(self.entry.get('total_episodes_count'))
                 - try_int(self.entry.get('not_aired_episodes_count'))),
             'next': next_episode,
-            'next_episode_aired_at': utc_timestamp(self.entry.get('next_to_watch_info', {}).get('date')),
+            'next_episode_aired_at': utc_timestamp((self.entry.get('next_to_watch_info') or {}).get('date')),
             'source_type': self.source_type,
             'source_seasons': self.entry.get('mapped_tvdb_seasons') or [],
         })
@@ -118,7 +119,7 @@ class SimklLibraryMapping:
 
     def get_items(self):
         entries = (
-            SimklEntry(entry, source_type, self.identifiers).get_item()
+            self.get_item(entry, source_type)
             for source_type, entries in self.entries.items() for entry in entries.values())
         items = {}
         for item in entries:
@@ -127,6 +128,14 @@ class SimklLibraryMapping:
             key = (item['item_type'], item['tmdb_id'])
             items[key] = self.merge(items[key], item) if key in items else item
         return list(items.values())
+
+    def get_item(self, entry, source_type):
+        # One malformed title must not stop the rest of the library from syncing.
+        try:
+            return SimklEntry(entry, source_type, self.identifiers).get_item()
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            simkl_id = ((entry.get('movie') or entry.get('show') or {}).get('ids') or {}).get('simkl')                 if isinstance(entry, dict) else None
+            kodi_log(f'SIMKL: skipped malformed {source_type} entry {simkl_id}: {exc!r}', 2)
 
     @staticmethod
     def merge(previous, current):

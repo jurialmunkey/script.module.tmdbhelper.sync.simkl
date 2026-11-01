@@ -1,16 +1,27 @@
+from email.utils import parsedate_to_datetime
 from time import time
 from urllib.parse import urlencode
 from jurialmunkey.ftools import cached_property
 from tmdbhelper.lib.api.request import NoCacheRequestAPI
+from tmdbhelper_sync_simkl.errors import SimklAPIError  # noqa: F401 (re-exported)
 from tmdbhelper_sync_simkl.settings import SimklSettings
 from tmdbhelper_sync_simkl.store import SimklStore
 
+DEFAULT_RETRY_AFTER = 60
 
-class SimklAPIError(Exception):
-    def __init__(self, code, status=0, message=None):
-        self.code = code
-        self.status = status
-        super().__init__(message or f'SIMKL: {code} (HTTP {status})')
+
+def get_retry_after(value):
+    """Seconds to wait from a Retry-After header: delay-seconds or an HTTP date."""
+    if not value:
+        return DEFAULT_RETRY_AFTER
+    try:
+        return max(0, int(value))
+    except ValueError:
+        pass
+    try:
+        return max(0, int(parsedate_to_datetime(value).timestamp() - time()))
+    except (TypeError, ValueError, OverflowError):
+        return DEFAULT_RETRY_AFTER
 
 
 class SimklAPI(NoCacheRequestAPI):
@@ -53,7 +64,7 @@ class SimklAPI(NoCacheRequestAPI):
         try:
             status = response.status_code
             if status == 429 and authorized:
-                self.store.set('backoff', time() + int(response.headers.get('Retry-After', 60)))
+                self.store.set('backoff', time() + get_retry_after(response.headers.get('Retry-After')))
             try:
                 body = response.json() if response.content else {}
             except ValueError:
@@ -68,6 +79,13 @@ class SimklAPI(NoCacheRequestAPI):
             raise SimklAPIError(error or 'request_failed', status)
         return body
 
+    def request_dict(self, path, *keys, **kwargs):
+        """Request a JSON object and check that it has the given keys."""
+        data = self.request(path, **kwargs)
+        if not isinstance(data, dict) or any(key not in data for key in keys):
+            raise SimklAPIError('invalid_response')
+        return data
+
     def get_activities(self):
         with self.store.lock('activities') as lock:
             if lock.lockstate == -1:
@@ -75,9 +93,8 @@ class SimklAPI(NoCacheRequestAPI):
             cached = self.store.get('activities')
             if cached is not None and cached['expires'] > time():
                 return cached['data']
-            data = self.request('sync/activities')
             # Null is valid for an empty account; a missing key is not.
-            data['all']
+            data = self.request_dict('sync/activities', 'all')
             self.store.set('activities', {'data': data, 'expires': time() + 60})
             return data
 
@@ -86,10 +103,11 @@ class SimklAPI(NoCacheRequestAPI):
             if lock.lockstate == -1:
                 raise SimklAPIError('request_aborted')
             cached = self.store.get('profile')
-            activity = self.get_activities().get('settings', {}).get('all')
+            activity = (self.get_activities().get('settings') or {}).get('all')
             if cached is not None and cached['activity'] == activity:
                 return cached['data']
-            data = self.request('users/settings', data={})
-            data['account']['id']
+            data = self.request_dict('users/settings', 'account', data={})
+            if not isinstance(data['account'], dict) or not data['account'].get('id'):
+                raise SimklAPIError('invalid_response')
             self.store.set('profile', {'data': data, 'activity': activity})
             return data

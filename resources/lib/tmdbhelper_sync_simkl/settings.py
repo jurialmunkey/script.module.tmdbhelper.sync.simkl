@@ -31,5 +31,8 @@ class SimklSettings:
 
     @property
     def account_key(self):
-        auth = self.authorization
-        return f'{self.client_id}.{auth["session_id"]}'
+        session_id = self.authorization.get('session_id')
+        if not session_id:
+            from tmdbhelper_sync_simkl.errors import SimklAPIError
+            raise SimklAPIError('authorization_required')
+        return f'{self.client_id}.{session_id}'

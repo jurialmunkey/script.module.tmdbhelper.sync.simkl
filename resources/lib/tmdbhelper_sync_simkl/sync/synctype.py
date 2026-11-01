@@ -12,8 +12,11 @@ class SyncWatchlist(SimklDataType):
     def get_records(self):
         if self.item_type not in ('movie', 'show'):
             return []
-        return [dict(item, rank=rank) for rank, item in enumerate(self.provider.library_items, 1)
-                if item['item_type'] == self.item_type and item['status'] == 'plantowatch']
+        items = [item for item in self.provider.library_items
+                 if item['item_type'] == self.item_type and item['status'] == 'plantowatch']
+        # SIMKL has no manual watchlist order: rank by date added, oldest first.
+        items.sort(key=lambda item: (item['listed_at'] or '', item['title'] or '', item['tmdb_id']))
+        return [dict(item, rank=rank) for rank, item in enumerate(items, 1)]
 
 
 class SyncWatched(DataTypeEpisodesInShows, SimklDataType):
@@ -71,7 +74,8 @@ class SyncPlayback(DataTypeEpisodesInShows, SimklDataType):
 
     def get_records(self):
         from tmdbhelper_sync_simkl.sync.playback import SimklPlaybackMapping
-        return SimklPlaybackMapping(self.provider.identifiers).get_records(
+        anime_ids = self.provider.library.get_entries().get('anime', {})
+        return SimklPlaybackMapping(self.provider.identifiers, anime_ids).get_records(
             self.provider.library.get_playback(self.item_type))
 
 
