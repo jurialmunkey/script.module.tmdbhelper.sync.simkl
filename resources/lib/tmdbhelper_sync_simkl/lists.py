@@ -62,7 +62,9 @@ class SimklUserLists:
     @staticmethod
     def get_pagination(data, page):
         pagination = data['pagination']
-        if not isinstance(pagination, dict) or pagination.get('page') != page                 or not isinstance(pagination.get('total_pages'), int):
+        if (
+                not isinstance(pagination, dict) or pagination.get('page') != page
+                or not isinstance(pagination.get('total_pages'), int)):
             raise SimklAPIError('invalid_response')
         return pagination
 

@@ -134,7 +134,9 @@ class SimklLibraryMapping:
         try:
             return SimklEntry(entry, source_type, self.identifiers).get_item()
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
-            simkl_id = ((entry.get('movie') or entry.get('show') or {}).get('ids') or {}).get('simkl')                 if isinstance(entry, dict) else None
+            simkl_id = (
+                ((entry.get('movie') or entry.get('show') or {}).get('ids') or {}).get('simkl')
+                if isinstance(entry, dict) else None)
             kodi_log(f'SIMKL: skipped malformed {source_type} entry {simkl_id}: {exc!r}', 2)
 
     @staticmethod
