@@ -17,21 +17,20 @@ actions, scrobbling, list monitoring, ratings or statistics suppliers.
 ## Install and connect
 
 1. Install the provider ZIP in Kodi and enable the addon.
-2. Register an **AUTH V2** application in [SIMKL developer settings](https://simkl.com/settings/developer/).
-   Choose **TV, devices & command line**. A client secret is not required.
-3. Enter its public client ID in this provider's settings, then choose **Connect
-   SIMKL account**. Open the displayed address on another device, enter the code
+2. Choose **Connect SIMKL account** in this provider's settings.
+   Open the displayed address on another device, enter the PIN code
    and approve read access. Passwords are never entered in Kodi.
-4. Choose this provider for Watchlist and/or History/Progress in TMDbHelper's
+3. Choose this provider for Watchlist and/or History/Progress in TMDbHelper's
    provider configuration. The SIMKL directory is independent of those selections.
 
 The addon is discovered after installation. Because it is not in TMDbHelper's
 built-in provider catalogue, it cannot be offered for installation while missing;
 the normal confirmation for a provider outside that catalogue still applies.
 
-The client ID is public and may be distributed with an application. This initial
-module leaves it configurable because no SIMKL app registration has been supplied.
-V1 credentials will not work with AUTH V2 or custom lists.
+The provider includes its public AUTH V2 client ID. Users authorize their own
+SIMKL accounts through the PIN flow; no app registration or client ID entry is
+needed. If you previously connected using a different client ID, reconnect once
+to authorize the bundled application.
 
 ## Authorization and storage
 
@@ -46,7 +45,7 @@ Tokens are stored in the addon's private Kodi settings, separate from the source
 snapshots. Treat the provider's addon-data folder as private and exclude its
 settings from shared backups. Tokens are never included in log messages or URLs.
 Each new authorization gets a separate snapshot namespace, including when the
-client ID or SIMKL account changes. Snapshots from earlier authorizations are
+SIMKL account changes. Snapshots from earlier authorizations are
 deleted after a successful connection.
 
 The device-specific API uses `/oauth2/device` and the device-code grant at

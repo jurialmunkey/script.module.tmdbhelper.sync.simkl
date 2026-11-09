@@ -77,9 +77,6 @@ class SimklAuthorization:
             return self.save_tokens(data, auth)
 
     def connect(self):
-        if not self.settings.client_id:
-            Dialog().ok('SIMKL', 'Enter your AUTH V2 client ID in this addon\'s settings first.')
-            return False
         try:
             code = self.api.request('oauth2/device', data={
                 'client_id': self.settings.client_id, 'scope': SCOPE,
@@ -129,7 +126,7 @@ class SimklAuthorization:
 
     def disconnect(self):
         auth = self.settings.authorization
-        # Revoke with the client the grant was issued to, even if the setting changed since.
+        # Revoke with the original client, including grants from before the bundled ID.
         if auth.get('refresh_token') and auth.get('client_id'):
             try:
                 self.api.request('oauth2/revoke', data={

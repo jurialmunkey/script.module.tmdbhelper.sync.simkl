@@ -7,14 +7,6 @@ msgctxt "#32000"
 msgid "SIMKL account"
 msgstr ""
 
-msgctxt "#32001"
-msgid "OAuth V2 client ID"
-msgstr ""
-
-msgctxt "#32002"
-msgid "Register an AUTH V2 app at simkl.com/settings/developer. Choose TV, devices & command line. No client secret is required."
-msgstr ""
-
 msgctxt "#32003"
 msgid "Connect SIMKL account"
 msgstr ""

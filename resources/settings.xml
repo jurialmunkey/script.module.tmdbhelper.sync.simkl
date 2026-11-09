@@ -3,12 +3,6 @@
     <section id="script.module.tmdbhelper.sync.simkl">
         <category id="account" label="32000">
             <group id="1">
-                <setting id="client_id" type="string" label="32001" help="32002">
-                    <level>0</level>
-                    <default/>
-                    <constraints><allowempty>true</allowempty></constraints>
-                    <control type="edit" format="string"><heading>32001</heading></control>
-                </setting>
                 <setting id="connect" type="action" label="32003">
                     <level>0</level>
                     <data>RunScript(script.module.tmdbhelper.sync.simkl,connect)</data>

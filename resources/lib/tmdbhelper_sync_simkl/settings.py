@@ -1,17 +1,15 @@
 from json import dumps, loads
 from xbmcaddon import Addon
 from xbmcvfs import translatePath
+from tmdbhelper_sync_simkl.keys import CLIENT_ID
 
 
 class SimklSettings:
     addon_id = 'script.module.tmdbhelper.sync.simkl'
+    client_id = CLIENT_ID
 
     def __init__(self):
         self.addon = Addon(self.addon_id)
-
-    @property
-    def client_id(self):
-        return self.addon.getSetting('client_id').strip()
 
     @property
     def version(self):
