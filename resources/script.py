@@ -1,5 +1,4 @@
-from os.path import join
-from sys import argv, path
+from sys import argv
 from xbmc import executebuiltin
 from xbmcaddon import Addon
 
@@ -19,8 +18,7 @@ def reopen_settings():
 
 def main():
     addon = Addon(ADDON_ID)
-    path.insert(0, join(Addon('plugin.video.themoviedb.helper').getAddonInfo('path'), 'resources'))
-    from tmdbhelper.lib.sync.providers.loader import SyncProviderLoader
+    from tmdbhelper_lib.sync.providers.interface import SyncProviderLoader
     module = SyncProviderLoader({
         'addonid': addon.getAddonInfo('id'), 'path': addon.getAddonInfo('path'),
     }).load_module()
@@ -44,7 +42,7 @@ def main():
 
 
 def invalidate_sync(provider):
-    from tmdbhelper.lib.sync.invalidator import SyncInvalidatorAll
+    from tmdbhelper_lib.sync.providers.interface import SyncInvalidatorAll
     SyncInvalidatorAll().invalidate_provider(provider)
 
 

@@ -1,7 +1,8 @@
 # TMDbHelper Sync - SIMKL
 
-Independent provider addon for TMDbHelper's version 3 provider interface. Requires
-TMDbHelper 6.20.2 or later. No changes to TMDbHelper or other providers are needed.
+Independent provider addon for TMDbHelper's version 4 provider interface. Requires
+TMDbHelper 6.21.3 or later. Standalone account actions access core through
+`tmdbhelper_lib.sync.providers.interface`.
 
 ## Features
 
